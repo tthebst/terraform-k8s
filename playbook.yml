@@ -1,1 +1,114 @@
-playbook.yml
+- name: setup workers
+  hosts: gcp_function_worker
+  remote_user: tgretler
+  vars:
+    service_account_file: ./terraform-test-key.json
+    project: terraform-test-270912
+    auth_kind: serviceaccount
+    scopes:
+      - https://www.googleapis.com/auth/compute
+
+  tasks:
+    - name: setup docker requirements
+      apt:
+        name: "{{ item }}"
+      with_items:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - gnupg2
+        - software-properties-common
+      become: yes
+
+    - name: setup docker repository
+      apt_repository:
+        name: deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable
+        become: yes
+
+    - name: install docker and iptable
+      apt:
+        name: "{{ item }}"
+      with_items:
+        - docker-ce
+        - docker-ce-cli
+        - containerd.io
+        - iptables
+        - arptables
+        - ebtables
+      become: yes
+      force: yes
+
+    - name: check ip table conifg
+      command: chdir=~/ {{ item }}
+      with_items:
+      - sudo update-alternatives --set iptables /usr/sbin/iptables-legacy
+      - sudo update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
+      - sudo update-alternatives --set arptables /usr/sbin/arptables-legacy
+      - sudo update-alternatives --set ebtables /usr/sbin/ebtables-legacy
+      become: yes
+
+    - name: install k8s
+      apt:
+        name: "{{ item }}"
+      with_items:
+        - kubelet
+        - kubeadm
+        - kubectl
+      become: yes
+      force: yes
+
+
+    - name: install kubernetes
+      command: chdir=~/ {{ item }}
+      with_items:
+      - sudo apt-mark hold kubelet kubeadm kubectl
+      become: sudo
+
+
+
+- name: setup master
+  hosts: gcp_function_master
+  remote_user: tgretler
+  vars:
+    service_account_file: ./terraform-test-key.json
+    project: terraform-test-270912
+    auth_kind: serviceaccount
+    scopes:
+      - https://www.googleapis.com/auth/compute
+
+  tasks:
+    - name: setup docker repository
+      command: chdir=~/ {{ item }}
+      with_items:
+      - sudo apt-get install apt-transport-https ca-certificates curl gnupg2 software-properties-common
+      - sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable"
+      become: sudo
+
+    - name: install docker community version
+      command: sudo apt-get install docker-ce docker-ce-cli containerd.io
+      become: sudo
+
+    - name: check ip table conifg
+      command: chdir=~/ {{ item }}
+      with_items:
+      - sudo apt-get install -y iptables arptables ebtables 
+      - sudo update-alternatives --set iptables /usr/sbin/iptables-legacy
+      - sudo update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
+      - sudo update-alternatives --set arptables /usr/sbin/arptables-legacy
+      - sudo update-alternatives --set ebtables /usr/sbin/ebtables-legacy
+      become: sudo
+
+    - name: install kubernetes
+      command: chdir=~/ {{ item }}
+      with_items:
+      - sudo apt-get install -y kubelet kubeadm kubectl
+      - sudo apt-mark hold kubelet kubeadm kubectl
+      become: sudo
+
+
+
+
+
+
+
+

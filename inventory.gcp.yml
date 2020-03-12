@@ -1,0 +1,9 @@
+plugin: gcp_compute
+projects:
+  - terraform-test-270912
+auth_kind: serviceaccount
+service_account_file: terraform-test-key.json
+keyed_groups:
+  # Create groups from GCE labels
+  - prefix: "gcp"
+    key: labels

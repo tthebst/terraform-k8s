@@ -30,7 +30,7 @@ resource "google_compute_firewall" "k8s-firewalll" {
 
 resource "google_compute_instance" "k8s-master" {
 
-  machine_type = "f1-micro"
+  machine_type = "g1-small"
   count        = var.number_master
   name         = "k8s-master-${count.index}"
   labels = {
@@ -55,7 +55,7 @@ resource "google_compute_instance" "k8s-master" {
 
 resource "google_compute_instance" "k8s-node" {
 
-  machine_type = "f1-micro"
+  machine_type = "g1-small"
   count        = var.number_worker
   name         = "k8s-node-${count.index}"
   labels = {
