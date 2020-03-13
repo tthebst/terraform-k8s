@@ -9,13 +9,23 @@ provider "google" {
   zone        = "europe-west6-c"
 }
 
-resource "google_compute_network" "k8s-network" {
-  name = "k8s-network"
+resource "google_compute_network" "main-k8s-network" {
+  name                    = "k8s-network"
+  auto_create_subnetworks = false
 }
+
+
+resource "google_compute_subnetwork" "k8s-network" {
+  name          = "k8s-subnetwork"
+  ip_cidr_range = "10.2.0.0/24"
+  region        = "europe-west6"
+  network       = google_compute_network.main-k8s-network.self_link
+}
+
 
 resource "google_compute_firewall" "k8s-firewalll" {
   name    = "k8s-firewall"
-  network = google_compute_network.k8s-network.name
+  network = google_compute_network.main-k8s-network.name
   allow {
     protocol = "icmp"
   }
@@ -46,7 +56,7 @@ resource "google_compute_instance" "k8s-master" {
 
 
   network_interface {
-    network = google_compute_network.k8s-network.self_link
+    subnetwork = google_compute_subnetwork.k8s-network.self_link
     access_config {
     }
   }
@@ -71,7 +81,7 @@ resource "google_compute_instance" "k8s-node" {
 
 
   network_interface {
-    network = google_compute_network.k8s-network.self_link
+    subnetwork = google_compute_subnetwork.k8s-network.self_link
     access_config {
     }
   }

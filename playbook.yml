@@ -1,3 +1,140 @@
+- name: setup master
+  hosts: gcp_function_master
+  remote_user: tgretler
+  vars:
+    service_account_file: ./terraform-test-key.json
+    project: terraform-test-270912
+    auth_kind: serviceaccount
+    scopes:
+      - https://www.googleapis.com/auth/compute
+  tasks:
+    - name: Install packages that allow apt to be used over HTTPS
+      apt:
+        name: "{{ packages }}"
+        state: present
+        update_cache: yes
+      vars:
+        packages:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - gnupg-agent
+        - software-properties-common
+      become: yes
+
+
+    - name: download docker script
+      get_url:
+        url: https://get.docker.com
+        dest: ~/get-docker.sh 
+        mode: '0777'
+      become: yes
+
+    - name: Execute docker installl script
+      command: sh ~/get-docker.sh 
+      become: yes
+
+    - name: Remove swapfile from /etc/fstab
+      mount:
+        name: "{{ item }}"
+        fstype: swap
+        state: absent
+      with_items:
+        - swap
+        - none
+
+    - name: Disable swap
+      command: swapoff -a
+      when: ansible_swaptotal_mb > 0
+
+    - name: Add an apt signing key for Kubernetes
+      apt_key:
+        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+        state: present
+      become: yes
+
+    - name: Adding apt repository for Kubernetes
+      apt_repository:
+        repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
+        state: present
+        filename: kubernetes.list
+      become: yes
+
+    - name: Install Kubernetes binaries
+      apt: 
+        name: "{{ packages }}"
+        state: present
+        update_cache: yes
+      vars:
+        packages:
+          - kubelet 
+          - kubeadm 
+          - kubectl
+      become: yes
+
+    - name: Restart kubelet
+      service:
+        name: kubelet
+        daemon_reload: yes
+        state: restarted
+      become: yes
+
+    - name: Initialize the Kubernetes cluster using kubeadm
+      command: kubeadm init --ignore-preflight-errors=all --apiserver-advertise-address={{ hostvars[inventory_hostname].networkInterfaces[0].networkIP }} --apiserver-cert-extra-sans={{ hostvars[inventory_hostname].networkInterfaces[0].networkIP }}  --node-name {{ hostvars[inventory_hostname].name }} --pod-network-cidr=10.2.0.0/24
+      become: yes
+
+    - name: setup k8s
+
+      copy: 
+        remote_src: yes
+        src: /etc/kubernetes/admin.conf
+        dest: /home/tgretler
+        force: yes
+      become: yes
+
+    - name: id id user
+      command: id -u
+      register: id_user
+    - name: id group
+      command: id -g
+      register: id_group
+
+
+
+
+    - name: add kubeconfig to env variables
+      lineinfile:
+        line: export KUBECONFIG=/home/tgretler/admin.conf
+        path: /home/tgretler/.profile
+
+
+
+    - name: ahahhahhah
+      shell: shell source /home/tgretler/.bashrc
+      sudo: no
+
+    - name: Install calico pod network
+      become: false
+      command: kubectl create -f https://docs.projectcalico.org/v3.4/getting-started/kubernetes/installation/hosted/calico.yaml
+
+
+    - name: Generate join command
+      command: kubeadm token create --print-join-command
+      register: join_command
+      become: yes
+
+
+    - name: Copy join command to local file
+      local_action: copy content="{{ join_command.stdout_lines[0] }}" dest="./join-command"
+      become: yes
+
+
+
+
+
+
+
+
 - name: setup workers
   hosts: gcp_function_worker
   remote_user: tgretler
@@ -10,140 +147,97 @@
 
   tasks:
 
+    - name: test
+      command: echo {{ hostvars[inventory_hostname].name }}
+      register: hello
+
+    - debug: msg="{{ hello.stdout }}"
+
+    - name: Install packages that allow apt to be used over HTTPS
+      apt:
+        name: "{{ packages }}"
+        state: present
+        update_cache: yes
+      vars:
+        packages:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - gnupg-agent
+        - software-properties-common
+      become: yes
+
+
     - name: download docker script
       get_url:
         url: https://get.docker.com
         dest: ~/get-docker.sh 
         mode: '0777'
+      become: yes
 
     - name: Execute docker installl script
       command: sh ~/get-docker.sh 
       become: yes
 
-    - name: isntall ifconifg
-      apt:
+    - name: Remove swapfile from /etc/fstab
+      mount:
         name: "{{ item }}"
-        update_cache: yes
-        force_apt_get: yes
+        fstype: swap
+        state: absent
       with_items:
-        - iptables
-        - arptables
-        - ebtables
-      become: yes
+        - swap
+        - none
 
+    - name: Disable swap
+      command: swapoff -a
+      when: ansible_swaptotal_mb > 0
 
-
-    - name: install k8s dependecies
-      apt:
-        name: apt-transport-https
-        update_cache: yes
-        force_apt_get: yes
-      become: yes
-
-    - name: download k8s stuff
-      get_url:
-        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
-        dest: ~/apt-key.gpg
-        mode: '0777'
-
-    - name: Add an Apt signing key, uses whichever key is at the URL
+    - name: Add an apt signing key for Kubernetes
       apt_key:
         url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
         state: present
       become: yes
 
-    - name: Execute docker installl script
-      shell: cat << EOF | sudo tee /etc/apt/sources.list.d/kubernetes.list deb https://apt.kubernetes.io/ kubernetes-xenial main EOF
-      become: yes
-
-    - name: isntall ifconifg
-      apt:
-        name: "{{ item }}"
-        update_cache: yes
-        force_apt_get: yes
-      with_items:
-        - kubelet
-        - kubeadm
-        - kubectl
-      become: yes
-
-
-    - name: install kubernetes
-      command: chdir=~/ {{ item }}
-      with_items:
-      - sudo apt-mark hold kubelet kubeadm kubectl
-      become: sudo
-
-
-
-- name: setup master
-  hosts: gcp_function_master
-  remote_user: tgretler
-  vars:
-    service_account_file: ./terraform-test-key.json
-    project: terraform-test-270912
-    auth_kind: serviceaccount
-    scopes:
-      - https://www.googleapis.com/auth/compute
-  tasks:
-
-    - name: Update repositories cache 
-      apt:
-        update_cache: yes
-      become: yes
-    - name: setup docker requirements
-      apt:
-        name: "{{ item }}"
-      with_items:
-        - apt-transport-https
-        - ca-certificates
-        - curl
-        - gnupg2
-        - software-properties-common
-      become: yes
-
-    - name: setup docker repository
+    - name: Adding apt repository for Kubernetes
       apt_repository:
-        repo: deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable
+        repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
         state: present
+        filename: kubernetes.list
+      become: yes
+
+    - name: Install Kubernetes binaries
+      apt: 
+        name: "{{ packages }}"
+        state: present
+        update_cache: yes
+      vars:
+        packages:
+          - kubelet 
+          - kubeadm 
+          - kubectl
       become: yes
 
 
-    - name: isntall docker
-      apt:
-        name: "{{ item }}"
-      with_items:
-        - docker-ce
-        - docker-ce-cli
-        - containerd.io
-        - iptables
-        - arptables
-        - ebtables
+    - name: Restart kubelet
+      service:
+        name: kubelet
+        daemon_reload: yes
+        state: restarted
       become: yes
 
-    - name: check ip table conifg
-      command: chdir=~/ {{ item }}
-      with_items:
-      - sudo update-alternatives --set iptables /usr/sbin/iptables-legacy
-      - sudo update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
-      - sudo update-alternatives --set arptables /usr/sbin/arptables-legacy
-      - sudo update-alternatives --set ebtables /usr/sbin/ebtables-legacy
+    - name: Install calico pod network
+      become: false
+      command: kubectl create -f https://docs.projectcalico.org/v3.4/getting-started/kubernetes/installation/hosted/calico.yaml
       become: yes
 
-    - name: install k8s
-      apt:
-        name: "{{ item }}"
-      with_items:
-        - kubelet
-        - kubeadm
-        - kubectl
+    - name: Copy the join command to server location
+      copy: src=join-command dest=/tmp/join-command.sh mode=0777
       become: yes
 
-    - name: install kubernetes
-      command: chdir=~/ {{ item }}
-      with_items:
-      - sudo apt-mark hold kubelet kubeadm kubectl
-      become: sudo
+    - name: Join the node to cluster
+      command: sh /tmp/join-command.sh
+      become: yes
+
 
 
 
