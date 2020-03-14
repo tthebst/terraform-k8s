@@ -72,6 +72,12 @@
           - kubectl
       become: yes
 
+    - name: Configure node ip
+      lineinfile:
+        path: /etc/default/kubelet
+        line: KUBELET_EXTRA_ARGS=--node-ip={{ hostvars[inventory_hostname].networkInterfaces[0].networkIP }}
+        create: yes
+      become: yes
     - name: Restart kubelet
       service:
         name: kubelet
@@ -83,39 +89,33 @@
       command: kubeadm init --ignore-preflight-errors=all --apiserver-advertise-address={{ hostvars[inventory_hostname].networkInterfaces[0].networkIP }} --apiserver-cert-extra-sans={{ hostvars[inventory_hostname].networkInterfaces[0].networkIP }}  --node-name {{ hostvars[inventory_hostname].name }} --pod-network-cidr=10.2.0.0/24
       become: yes
 
-    - name: setup k8s
 
-      copy: 
-        remote_src: yes
-        src: /etc/kubernetes/admin.conf
-        dest: /home/tgretler
-        force: yes
+    - name: Setup kubeconfig for vagrant user
+      command: mkdir -p /home/tgretler/.kube
       become: yes
 
-    - name: id id user
-      command: id -u
-      register: id_user
-    - name: id group
-      command: id -g
-      register: id_group
+    - name: Copy a new "sudoers" file into place, after passing validation with visudo
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /home/tgretler/.kube/config
+        remote_src: yes
+      become: yes
+
+    - name: Setup kubeconfig for vagrant user
+      command: chown tgretler:tgretler /home/tgretler/.kube/config
+      become: yes
 
 
+    - name: k8s version
+      shell: kubectl version | base64 | tr -d '\n'
+      register: version 
+              
+    - debug:  "{{ version.stdout }}"
 
 
-    - name: add kubeconfig to env variables
-      lineinfile:
-        line: export KUBECONFIG=/home/tgretler/admin.conf
-        path: /home/tgretler/.profile
-
-
-
-    - name: ahahhahhah
-      shell: shell source /home/tgretler/.bashrc
-      sudo: no
-
-    - name: Install calico pod network
+    - name: Install waeve pod network
       become: false
-      command: kubectl create -f https://docs.projectcalico.org/v3.4/getting-started/kubernetes/installation/hosted/calico.yaml
+      command: kubectl apply -f https://cloud.weave.works/k8s/net?k8s-version={{ version.stdout }}
 
 
     - name: Generate join command
@@ -123,9 +123,11 @@
       register: join_command
       become: yes
 
+    - debug:  "{{ join_command.stdout[0] }}"
+    - debug:  "{{ join_command.stdout }}"
 
     - name: Copy join command to local file
-      local_action: copy content="{{ join_command.stdout_lines[0] }}" dest="./join-command"
+      local_action: copy content="{{ join_command.stdout_lines[0] }}" dest="/Users/tgretler/scratch/join-command"
       become: yes
 
 
@@ -225,13 +227,9 @@
         state: restarted
       become: yes
 
-    - name: Install calico pod network
-      become: false
-      command: kubectl create -f https://docs.projectcalico.org/v3.4/getting-started/kubernetes/installation/hosted/calico.yaml
-      become: yes
 
     - name: Copy the join command to server location
-      copy: src=join-command dest=/tmp/join-command.sh mode=0777
+      copy: src=/Users/tgretler/scratch/join-command dest=/tmp/join-command.sh mode=0777
       become: yes
 
     - name: Join the node to cluster
