@@ -32,7 +32,11 @@ resource "google_compute_firewall" "k8s-firewalll" {
 
   allow {
     protocol = "tcp"
-    ports    = ["22", "8000"]
+    ports    = ["22", "8000", "443", "10250-10256", "2379-2380", "6443", "10250", "30000-32767", "6783"]
+  }
+  allow {
+    protocol = "udp"
+    ports    = ["6783"]
   }
 
 }
@@ -49,7 +53,7 @@ resource "google_compute_instance" "k8s-master" {
 
   boot_disk {
     initialize_params {
-      image = "ubuntu-1804-lts"
+      image = "ubuntu-1604-lts"
     }
   }
 
@@ -74,7 +78,7 @@ resource "google_compute_instance" "k8s-node" {
 
   boot_disk {
     initialize_params {
-      image = "debian-cloud/debian-9"
+      image = "ubuntu-1604-lts"
     }
   }
 
