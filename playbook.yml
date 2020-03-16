@@ -24,13 +24,13 @@
 
     - name: Add an apt signing key for Docker
       apt_key:
-        url: https://download.docker.com/linux/ubuntu/gpg
+        url: https://download.docker.com/linux/debian/gpg
         state: present
       become: yes
 
     - name: Add apt repository for stable version
       apt_repository:
-        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable
+        repo: deb [arch=amd64] https://download.docker.com/linux/debian stretch stable
         state: present
       become: yes
 
@@ -181,13 +181,13 @@
 
     - name: Add an apt signing key for Docker
       apt_key:
-        url: https://download.docker.com/linux/ubuntu/gpg
+        url: https://download.docker.com/linux/debian/gpg
         state: present
       become: yes
 
     - name: Add apt repository for stable version
       apt_repository:
-        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable
+        repo: deb [arch=amd64] https://download.docker.com/linux/debian stretch stable
         state: present
       become: yes
 

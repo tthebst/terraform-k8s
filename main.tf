@@ -53,7 +53,7 @@ resource "google_compute_instance" "k8s-master" {
 
   boot_disk {
     initialize_params {
-      image = "ubuntu-1604-lts"
+      image = "debian-cloud/debian-9"
     }
   }
 
@@ -78,7 +78,7 @@ resource "google_compute_instance" "k8s-node" {
 
   boot_disk {
     initialize_params {
-      image = "ubuntu-1604-lts"
+      image = "debian-cloud/debian-9"
     }
   }
 
